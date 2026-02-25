@@ -3,12 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Conversation extends Model
 {
     protected $fillable = [
-        'user_one_id',
-        'user_two_id',
+        'name',
+        'is_group',
+        'created_by'
+    ];
+    protected $casts = [
+        'is_group' => 'boolean',
     ];
 
     public function messages()
@@ -16,13 +21,24 @@ class Conversation extends Model
         return $this->hasMany(Message::class);
     }
 
-    public function userOne()
+    public function users()
     {
-        return $this->belongsTo(User::class, 'user_one_id');
+        return $this->belongsToMany(
+            User::class,
+            'conversation_user',
+            'conversation_id',
+            'user_id'
+        );
     }
 
-    public function userTwo()
+    public function creator()
     {
-        return $this->belongsTo(User::class, 'user_two_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
-}
+
+    public function lastMessage():HasOne
+    {
+        return $this->hasOne(Message::class)->latestOfMany();
+    }
+
+    }

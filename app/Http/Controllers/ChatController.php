@@ -7,83 +7,52 @@ use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class ChatController extends Controller
 {
 
     public function index()
-        {
-        $authId = auth()->id();
-
-            $conversations = Conversation::query()
-                ->where('user_one_id', $authId)
-                ->orWhere('user_two_id', $authId)
-                ->with(['messages' => function ($query) {
-                    $query->latest()->limit(1);
-                }])
-                ->get()
-                ->map(function ($conversation) use ($authId) {
-                    $otherUser = $conversation->user_one_id == $authId
-                        ? $conversation->userTwo
-                        : $conversation->userOne;
-
-                    $lastMessage = $conversation->messages->first();
-
-                    $unreadCount = $conversation->messages()
-                        ->whereNull('read_at')
-                        ->where('receiver_id', $authId)
-                        ->count();
-
-                    return [
-                        'conversation_id' => $conversation->id,
-                        'user' => $otherUser,
-                        'last_message' => $lastMessage,
-                        'unread_count' => $unreadCount,
-                        'updated_at' => $conversation->updated_at,
-                    ];
-                })
-                ->sortByDesc('updated_at')
-                ->values();
-        $userId = auth()->id();
-
-        $users = User::where('users.id', '!=', $userId)
-            ->leftJoin('messages', function ($join) use ($userId) {
-                $join->on(function ($query) use ($userId) {
-                    $query->whereColumn('messages.sender_id', 'users.id')
-                        ->where('messages.receiver_id', $userId);
-                })->orOn(function ($query) use ($userId) {
-                    $query->whereColumn('messages.receiver_id', 'users.id')
-                        ->where('messages.sender_id', $userId);
-                });
-            })
-            ->select('users.*', DB::raw('MAX(messages.created_at) as last_message_at'))
-            ->groupBy('users.id', 'users.name', 'users.email')
-            ->orderByDesc('last_message_at')
-            ->orderBy('users.name')
-            ->get();
-
-            return inertia('Chat/Index', [
-                'conversations' => $conversations,
-                'user' => auth()->user(),
-            'chatUser' => $users,
-            ]);
-        }
-    private function getOrCreateConversation($userA, $userB)
     {
-        $userOne = min($userA, $userB);
-        $userTwo = max($userA, $userB);
+        $conversations = auth()->user()
+            ->conversations()
+            ->with(['users', 'lastMessage.sender'])
+            ->latest()
+            ->get()
+            ->map(function ($conversation) {
 
-        return Conversation::firstOrCreate([
-            'user_one_id' => $userOne,
-            'user_two_id' => $userTwo,
+                // Private chat → show other user's name
+                if (!$conversation->is_group) {
+                    $otherUser = $conversation->users
+                        ->where('id', '!=', auth()->id())
+                        ->first();
+
+                    $conversation->name = $otherUser?->name;
+                }
+
+                return [
+                    'conversation_id' => $conversation->id,
+                    'name' => $conversation->name,
+                    'is_group' => $conversation->is_group,
+                    'users' => $conversation->users,
+                    'last_message' => $conversation->lastMessage
+                ];
+            });
+
+        return Inertia::render('Chat/Index', [
+            'conversations' => $conversations,
+            'users' => User::where('id', '!=', auth()->id())->get()
         ]);
     }
 
-    public function show(User $user)
+
+    public function show(Conversation $conversation)
     {
         $authId = auth()->id();
 
-        $conversation = $this->getOrCreateConversation($authId, $user->id);
+        if (!$conversation->users->contains(auth()->id())) {
+            abort(403);
+        }
 
         $messages = $conversation->messages()
             ->with(['sender' , 'attachments'])
@@ -102,7 +71,7 @@ class ChatController extends Controller
     {
         $request->validate([
             'body' => 'nullable|string',
-            'file' => 'nullable',
+            'file' => 'nullable|array',
             'file.*' => 'file|max:10240',
         ]);
 
@@ -113,20 +82,13 @@ class ChatController extends Controller
         $authId = auth()->id();
 
         // Check user belongs to conversation
-        if (!in_array($authId, [
-            $conversation->user_one_id,
-            $conversation->user_two_id
-        ])) {
+        if (!$conversation->users->contains($authId)) {
             abort(403);
         }
 
-        $receiverId = $conversation->user_one_id == $authId
-            ? $conversation->user_two_id
-            : $conversation->user_one_id;
 
         $message = $conversation->messages()->create([
             'sender_id' => $authId,
-            'receiver_id' => $receiverId,
             'body' => $request->body,
         ]);
 
@@ -147,5 +109,73 @@ class ChatController extends Controller
         broadcast(new MessageSent($message))->toOthers();
 
         return response()->json(['message' => $message]);
+    }
+
+    public function createGroup(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'users' => 'required|array|min:1',
+            'users.*' => 'exists:users,id'
+        ]);
+
+        $conversation = Conversation::create([
+            'name' => $request->name,
+            'is_group' => true,
+            'created_by' => auth()->id(),
+        ]);
+
+        $allUsers = array_unique(
+            array_merge($request->users, [auth()->id()])
+        );
+
+        $conversation->users()->attach($allUsers);
+
+        $conversation->load('users');
+
+        return response()->json([
+            'conversation' => [
+                'conversation_id' => $conversation->id,
+                'name' => $conversation->name,
+                'is_group' => $conversation->is_group,
+                'users' => $conversation->users,
+                'last_message' => null
+            ]
+        ]);
+    }
+    public function startConversation(User $user)
+    {
+        $authUser = auth()->user();
+
+        // Prevent self chat
+        if ($authUser->id === $user->id) {
+            return response()->json(['error' => 'Cannot chat with yourself'], 400);
+        }
+
+        // Check if conversation already exists
+        $conversation = Conversation::where('is_group', false)
+            ->whereHas('users', function ($q) use ($authUser) {
+                $q->where('user_id', $authUser->id);
+            })
+            ->whereHas('users', function ($q) use ($user) {
+                $q->where('user_id', $user->id);
+            })
+            ->first();
+
+        if (!$conversation) {
+            // Create new conversation
+            $conversation = Conversation::create([
+                'is_group' => false,
+            ]);
+
+            $conversation->users()->attach([
+                $authUser->id,
+                $user->id
+            ]);
+        }
+
+        return response()->json([
+            'conversation_id' => $conversation->id
+        ]);
     }
 }

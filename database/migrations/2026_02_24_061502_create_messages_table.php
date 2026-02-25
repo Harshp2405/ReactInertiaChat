@@ -26,7 +26,7 @@ return new class extends Migration
                 ->constrained('users')
                 ->cascadeOnDelete();
 
-            $table->text('body');
+            $table->text('body')->nullable();
 
             $table->timestamp('read_at')->nullable();
 

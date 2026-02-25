@@ -1,153 +1,266 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { useForm } from '@inertiajs/react';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import Show from './Show';
-import { useForm } from '@inertiajs/react';
+import CreateGroup from './CreateGroup';
 
-
-
-const Index = ({ auth, chatUser, conversations }) => {
-    // console.log(conversations , "=================================");
-    const [users, setUsers] = useState(chatUser || []);
-    const [selectedUser, setSelectedUser] = useState(null);
+const Index = ({ auth, conversations, users }) => {
+    const [conversationList, setConversationList] = useState(
+        conversations || [],
+    );
+// console.log(conversationList);
+    const [selectedConversation, setSelectedConversation] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationId, setConversationId] = useState(null);
     const [sending, setSending] = useState(false);
+
+
+
+
+    const [showGroupModal, setShowGroupModal] = useState(false);
+
+
     const { data, setData } = useForm({
         body: '',
-        images: [],
+        file: [],
     });
 
     /* ================= LOAD MESSAGES ================= */
     useEffect(() => {
-        if (!selectedUser) return;
+        if (!selectedConversation) return;
 
         axios
-            .get(`/chat/${selectedUser.id}`)
+            .get(`/chat/conversation/${selectedConversation.conversation_id}`)
             .then((res) => {
                 setMessages(res.data.getmessages || []);
                 setConversationId(res.data.conversation_id);
             })
-            .catch((err) => console.error(err));
-    }, [selectedUser]);
+            .catch(console.error);
+    }, [selectedConversation]);
 
     /* ================= SEND MESSAGE ================= */
     const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!conversationId) return;
+        e.preventDefault();
+        if (!conversationId) return;
 
-    try {
-        setSending(true);
-        const formData = new FormData();
+        try {
+            setSending(true);
 
-        // Append text
-        formData.append('body', data.body || '');
+            const formData = new FormData();
+            formData.append('body', data.body || '');
 
-        // Append files (multiple)
-        if (data.images && data.images.length > 0) {
-            for (let i = 0; i < data.images.length; i++) {
-                formData.append('file[]', data.images[i]);
+            if (data.file?.length > 0) {
+                for (let i = 0; i < data.file.length; i++) {
+                    formData.append('file[]', data.file[i]);
+                }
             }
+
+            const response = await axios.post(
+                `/chat/${conversationId}/send`,
+                formData,
+                { headers: { 'Content-Type': 'multipart/form-data' } },
+            );
+
+            const newMessage = response.data.message;
+
+            // Add message to chat
+            setMessages((prev) => [...prev, newMessage]);
+
+            // Move conversation to top
+            setConversationList((prev) => {
+                const updated = prev.filter(
+                    (c) => c.conversation_id !== conversationId,
+                );
+
+                const current = prev.find(
+                    (c) => c.conversation_id === conversationId,
+                );
+
+                if (!current) return prev;
+
+                return [{ ...current, last_message: newMessage }, ...updated];
+            });
+
+            // Reset form
+            setData({
+                body: '',
+                file: [],
+            });
+        } catch (error) {
+            console.error(error);
+    
+            if (error.response) {
+                if (error.response.status === 422) {
+                    alert(error.response.data.error || "Message or file required");
+                } else if (error.response.status === 403) {
+                    alert("You are not allowed to send message.");
+                } else {
+                    alert("Server error. Please try again.");
+                }
+            } else {
+                alert("Network error. Check your connection.");
+            }
+        }finally {
+            setSending(false);
         }
+    };
 
-        const response = await axios.post(
-            `/chat/${conversationId}/send`,
-            formData,
-            {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            }
-        );
-        console.log(response.data)
-
-        
-        // Add new message instantly
-        setMessages((prev) => [...prev, response.data.message]);
-        
-
-        setUsers((prevUsers) => {
-            const updated = prevUsers.filter((u) => u.id !== selectedUser.id);
-
-            return [selectedUser, ...updated];
-        });
-
-        console.log(data, " data================================");
-        console.log(formData , "=======================Form Data");
-        // Reset form
-        setData((prev) => ({
-            ...prev,
-            body: '',
-            images: [],
-        }));
-
-    } catch (error) {
-        console.error(error);
-    }finally{
-        setSending(false);
-    }
-};
-
-
+    /* ================= REALTIME ================= */
     useEffect(() => {
         if (!conversationId) return;
 
-        window.Echo.private(`chat.${conversationId}`).listen(
-            '.message.sent',
-            (e) => {
-                setMessages((prev) => [...prev, e.message]);
+        const channel = window.Echo.private(`chat.${conversationId}`);
 
-                
-                setUsers((prevUsers) => {
-                    const senderId = e.message.sender_id;
+        channel.listen('.message.sent', (e) => {
+            setMessages((prev) => [...prev, e.message]);
 
-                    const updated = prevUsers.filter((u) => u.id !== senderId);
+            setConversationList((prev) => {
+                const updated = prev.filter(
+                    (c) => c.conversation_id !== e.message.conversation_id,
+                );
 
-                    const senderUser = prevUsers.find((u) => u.id === senderId);
+                const current = prev.find(
+                    (c) => c.conversation_id === e.message.conversation_id,
+                );
 
-                    if (!senderUser) return prevUsers;
+                if (!current) return prev;
 
-                    return [senderUser, ...updated];
-                });
-            },
-        );
+                return [{ ...current, last_message: e.message }, ...updated];
+            });
+        });
 
         return () => {
-            window.Echo.leave(`private-chat.${conversationId}`);
+            window.Echo.leave(`chat.${conversationId}`);
         };
     }, [conversationId]);
+    /* ==================Start New Chat================ */
+    const startChat = async (userId) => {
+        try {
+            const res = await axios.post(`/chat/start/${userId}`);
+            const newConversationId = res.data.conversation_id;
 
+            const exists = conversationList.find(
+                (c) => c?.conversation_id === newConversationId,
+            );
+
+            if (exists) {
+                setSelectedConversation(exists);
+                return;
+            }
+
+            // Create a temporary conversation object
+            const selectedUser = users.find((u) => u.id === userId);
+
+            const newConversation = {
+                conversation_id: newConversationId,
+                is_group: false,
+                users: [auth.user, selectedUser],
+                last_message: null,
+            };
+
+            setConversationList((prev) => [newConversation, ...prev]);
+            setSelectedConversation(newConversation);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+    /*Filter Exist Conversition======================== */
+    const existingUserIds =
+        conversationList
+            ?.filter((c) => !c.is_group) // only private chats
+            .flatMap((c) =>
+                c.users?.filter((u) => u.id !== auth.user.id).map((u) => u.id),
+            ) || [];
+
+    /*========================createGroup======================= */
+    
     return (
-        <AuthenticatedLayout
-            
-        >
-            <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg bg-white shadow">
-                {/* ================= USER LIST ================= */}
-                <div className="w-1/3 overflow-y-auto border-r bg-gray-50">
-                    <div className="border-b p-4 font-semibold">Users</div>
+        <AuthenticatedLayout>
+            {/* Create Group */}
 
-                    {users.map((user) => (
-                        <div
-                            key={user.id}
-                            onClick={() => setSelectedUser(user)}
-                            className={`cursor-pointer border-b p-4 hover:bg-gray-100 ${
-                                selectedUser?.id === user.id
-                                    ? 'bg-gray-200'
-                                    : ''
-                            }`}
-                        >
-                            <div className="font-medium">{user.name}</div>
-                            <div className="text-sm text-gray-500">
-                                {user.email}
+            <div className="flex justify-end border-b bg-white p-3">
+                <button
+                    onClick={() => setShowGroupModal(true)}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                >
+                    + Create Group
+                </button>
+            </div>
+
+            <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg bg-white shadow">
+                <div className="border-b p-4">
+                    <div className="mb-2 font-semibold">Start New Chat</div>
+
+                    {users
+                        .filter((user) => !existingUserIds.includes(user.id))
+                        .map((user) => (
+                            <div
+                                key={user.id}
+                                onClick={() => startChat(user.id)}
+                                className="cursor-pointer rounded p-2 hover:bg-gray-200"
+                            >
+                                {user.name}
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                </div>
+                {/* ================= CONVERSATION LIST ================= */}
+                <div className="w-1/3 overflow-y-auto border-r bg-gray-50">
+                    <div className="border-b p-4 font-semibold">
+                        Conversations
+                    </div>
+
+                    {conversationList
+                        ?.filter((c) => c && c.conversation_id)
+                        .map((conversation) => (
+                            <div
+                                key={conversation.conversation_id}
+                                onClick={() =>
+                                    setSelectedConversation(conversation)
+                                }
+                                className={`cursor-pointer border-b p-4 hover:bg-gray-100 ${
+                                    selectedConversation?.conversation_id ===
+                                    conversation.conversation_id
+                                        ? 'bg-gray-200'
+                                        : ''
+                                }`}
+                            >
+                                <div className="font-medium">
+                                    {conversation.is_group
+                                        ? conversation.name
+                                        : conversation.users?.find(
+                                              (u) => u.id !== auth.user.id,
+                                          )?.name}
+                                </div>
+
+                                <div className="truncate text-sm text-gray-500">
+                                    {conversation.last_message ? (
+                                        conversation.is_group ? (
+                                            <>
+                                                <span className="font-medium">
+                                                    {
+                                                        conversation
+                                                            .last_message.sender
+                                                            ?.name
+                                                    }
+                                                    :
+                                                </span>{' '}
+                                                {conversation.last_message.body}
+                                            </>
+                                        ) : (
+                                            conversation.last_message.body
+                                        )
+                                    ) : (
+                                        'No messages yet'
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                 </div>
 
                 {/* ================= CHAT BOX ================= */}
-            
                 <Show
-                    selectedUser={selectedUser}
+                    selectedConversation={selectedConversation}
                     messages={messages}
                     auth={auth}
                     data={data}
@@ -156,6 +269,17 @@ const Index = ({ auth, chatUser, conversations }) => {
                     processing={sending}
                 />
             </div>
+
+            {showGroupModal === true ? (
+                <CreateGroup
+                    users={users}
+                    auth={auth}
+                    setShowGroupModal={setShowGroupModal}
+                    setConversationList={setConversationList}
+                    showGroupModal={showGroupModal}
+                    setSelectedConversation={setSelectedConversation}
+                />
+            ) : null}
         </AuthenticatedLayout>
     );
 };

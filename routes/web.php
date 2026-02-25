@@ -27,8 +27,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
 
-    Route::get('/chat/{user}', [ChatController::class, 'show'])
-        ->name('chat.show');
+    // Route::get('/chat/{user}', [ChatController::class, 'show'])
+    //     ->name('chat.show');
 
     // Send message
     Route::post('/chat/{conversation}/send', [ChatController::class, 'send'])
@@ -36,6 +36,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/chats', [ChatController::class, 'index'])
         ->name('chat.index');
+
+    Route::get('/chat/conversation/{conversation}', [ChatController::class, 'show'])
+        ->name('chat.show');
+
+    Route::post('/chat/group/create', [ChatController::class, 'createGroup'])
+        ->name('chat.group.create');
+
+    Route::post('/chat/start/{user}', [ChatController::class, 'startConversation']);
 });
 
 require __DIR__.'/auth.php';
