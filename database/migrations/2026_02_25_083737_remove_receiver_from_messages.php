@@ -12,6 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('messages', function (Blueprint $table) {
+            // $table->dropColumn('receiver_id');
+            $table->dropForeign(['receiver_id']);
+
+            // 2️⃣ Then drop the column
             $table->dropColumn('receiver_id');
         });
     }

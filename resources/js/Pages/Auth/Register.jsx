@@ -111,7 +111,7 @@ export default function Register() {
                         required
                         name="profile_image"
                         // value={data.profile_image}
-                        className="mt-1 block w-full"
+                        className="mt-1 block w-full text-white"
                         onChange={(e) =>
                             setData({
                                 ...data,

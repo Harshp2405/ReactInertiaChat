@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\GroupCreated;
+use App\Events\MessageRead;
 use App\Events\MessageSent;
 use App\Models\Conversation;
 use App\Models\User;
@@ -51,18 +52,29 @@ class ChatController extends Controller
 
     public function show(Conversation $conversation)
     {
-        $authId = auth()->id();
+        
 
         if (!$conversation->users->contains(auth()->id())) {
             abort(403);
         }
 
+        
         $messages = $conversation->messages()
             ->with(['sender' , 'attachments'])
             ->orderBy('created_at', 'asc')
             ->take(50)
             ->get()
             ->values();
+            
+        //     $conversation->messages()
+        //         ->whereNull('read_at')
+        //         ->where('sender_id', '!=', auth()->id())
+        //         ->update([
+        //             'read_at' => now()
+        //         ]);
+        // broadcast(new MessageRead($conversation->id, auth()->id()))->toOthers();
+
+        $this->markAsRead($conversation);
 
         return response()->json([
             'conversation_id' => $conversation->id,
@@ -362,5 +374,25 @@ class ChatController extends Controller
             'message' => $systemMessage,
             'removed_user_id' => $request->user_id
         ]);
+    }
+
+    public function markAsRead(Conversation $conversation)
+    {
+        $authId = auth()->id();
+
+        if (!$conversation->users->contains($authId)) {
+            abort(403);
+        }
+
+        $conversation->messages()
+            ->whereNull('read_at')
+            ->where('sender_id', '!=', $authId)
+            ->update([
+                'read_at' => now()
+            ]);
+
+        broadcast(new MessageRead($conversation->id, $authId))->toOthers();
+
+        return response()->json(['success' => true]);
     }
 }

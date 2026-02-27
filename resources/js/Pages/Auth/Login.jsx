@@ -80,6 +80,18 @@ export default function Login({ status, canResetPassword }) {
                     </label>
                 </div>
 
+                <div className="mt-4 flex items-center justify-start">
+                    
+                        <Link
+                            href={"/register"}
+                            className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-gray-400 dark:hover:text-gray-100 dark:focus:ring-offset-gray-800"
+                        >
+                            <PrimaryButton className="ms-4" disabled={processing}>
+                            Register
+                    </PrimaryButton>
+                        </Link>
+                    
+                </div>
                 <div className="mt-4 flex items-center justify-end">
                     {canResetPassword && (
                         <Link

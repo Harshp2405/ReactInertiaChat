@@ -1,11 +1,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { useForm } from '@inertiajs/react';
 import axios from 'axios';
+import { Trash } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import Show from './Show';
-import CreateGroup from './CreateGroup';
-import { DeleteIcon, Trash } from 'lucide-react';
 import AddMemberModal from './AddMemberModal';
+import CreateGroup from './CreateGroup';
+import Show from './Show';
 
 const Index = ({ auth, conversations, users }) => {
     const [conversationList, setConversationList] = useState(
@@ -13,7 +13,7 @@ const Index = ({ auth, conversations, users }) => {
     );
     // console.log(conversations);
     // console.log(users)
-    
+
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationId, setConversationId] = useState(null);
@@ -133,40 +133,59 @@ const Index = ({ auth, conversations, users }) => {
         /* ================= USER CHANNEL ================= */
         const userChannel = window.Echo.private(`user.${auth.user.id}`);
 
-        userChannel.listen('.group.created', (e) => {
-            const newConversation = {
-                conversation_id: e.conversation.id,
-                name: e.conversation.name,
-                is_group: true,
-                users: e.conversation.users,
-                last_message: null,
-            };
+        userChannel.listen('.message.sent', (e) => {
+            const newMessage = e.message;
 
             setConversationList((prev) => {
-                const exists = prev.find(
-                    (c) => c.conversation_id === e.conversation.id,
-                );
+                let exists = false;
 
-                if (exists) return prev;
+                const updated = prev.map((c) => {
+                    if (c.conversation_id === newMessage.conversation_id) {
+                        exists = true;
+                        return {
+                            ...c,
+                            last_message: newMessage,
+                        };
+                    }
+                    return c;
+                });
 
-                return [
-                    {
-                        conversation_id: e.conversation.id,
-                        name: e.conversation.name,
-                        is_group: true,
-                        users: e.conversation.users,
-                        last_message: null,
-                    },
-                    ...prev,
-                ];
+                // If conversation not in sidebar (rare case)
+                if (!exists) {
+                    updated.unshift({
+                        conversation_id: newMessage.conversation_id,
+                        name: newMessage.sender?.name,
+                        is_group: false,
+                        users: [],
+                        last_message: newMessage,
+                    });
+                }
+
+                return sortConversations(updated);
             });
+
+            // If this conversation is currently open → add message
+            if (
+                selectedConversation?.conversation_id ===
+                newMessage.conversation_id
+            ) {
+
+
+                
+
+                setMessages((prev) => {
+                    const exists = prev.find((m) => m.id === newMessage.id);
+                    if (exists) return prev;
+                    return [...prev, newMessage];
+                });
+            }
         });
 
         /* ================= CLEANUP ================= */
         return () => {
             window.Echo.leave(`user.${auth.user.id}`);
         };
-    }, [auth.user.id]);
+    }, [auth.user.id, selectedConversation]);
 
     /* ========================================Start New Chat================ */
     const startChat = async (userId) => {
@@ -215,6 +234,10 @@ const Index = ({ auth, conversations, users }) => {
         const channel = window.Echo.private(`chat.${conversationId}`);
 
         channel.listen('.message.sent', (e) => {
+
+            const newMessage = e.message;
+
+
             setMessages((prev) => {
                 // Prevent duplicate by ID check
                 const exists = prev.find((m) => m.id === e.message.id);
@@ -232,6 +255,22 @@ const Index = ({ auth, conversations, users }) => {
 
                 return sortConversations(newList);
             });
+            if (newMessage.sender_id !== auth.user.id) {
+                axios.post(`/conversations/${newMessage.conversation_id}/read`);
+            }
+        });
+
+        // Double tick logic
+
+        channel.listen('.message.read', (e) => {
+
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.sender_id === auth.user.id && !msg.read_at
+                        ? { ...msg, read_at: new Date().toISOString() }
+                        : msg,
+                ),
+            );
         });
 
         return () => {
@@ -262,10 +301,26 @@ const Index = ({ auth, conversations, users }) => {
         }
     };
 
+    /* =====================================Get Profile Image======================================== */
+
+    const getConversationAvatar = (conversation) => {
+        if (conversation.is_group) {
+            return '/storage/profile_images/defaultimage/default.webp';
+        }
+
+        const otherUser = conversation.users?.find(
+            (u) => u.id !== auth.user.id,
+        );
+
+        return otherUser?.profile_image
+            ? `/storage/${otherUser.profile_image}`
+            : '/storage/profile_images/defaultimage/default.webp';
+    };
+
     return (
         <AuthenticatedLayout>
             {/* Create Group */}
-           
+
             <div className="flex justify-between border-b bg-white p-3">
                 <div>
                     {auth.user.profile_image !== null ? (
@@ -311,7 +366,7 @@ const Index = ({ auth, conversations, users }) => {
                     <div className="border-b p-4 font-semibold">
                         Conversations
                     </div>
-                    
+
                     {conversationList
                         ?.filter((c) => c && c.conversation_id)
                         .map((conversation) => (
@@ -320,33 +375,19 @@ const Index = ({ auth, conversations, users }) => {
                                     setSelectedConversation(conversation)
                                 }
                                 key={conversation.conversation_id}
-                                className={`flex flex-row gap-5 justify-start border-b p-2 ${
-                                // className={`grid grid-cols-12 gap-2 justify-between border-b p-4 ${
+                                className={`flex flex-row justify-start gap-5 border-b p-2 ${
+                                    // className={`grid grid-cols-12 gap-2 justify-between border-b p-4 ${
                                     selectedConversation?.conversation_id ===
                                     conversation.conversation_id
                                         ? 'bg-gray-300'
                                         : ''
                                 }`}
                             >
-                                <div className="">
-                                    {conversation.users[0].profile_image !==
-                                    null ? (
-                                        <img
-                                            src={`/storage/${
-                                                conversation.users[0]
-                                                    .profile_image
-                                            }`}
-                                            alt="Profile"
-                                            className="ml-2 inline-block h-8 w-8 rounded-full"
-                                        />
-                                    ) : (
-                                        <img
-                                            src={`/storage/profile_images/defaultimage/default.webp`}
-                                            alt="Profile"
-                                            className="ml-2 inline-block h-8 w-8 rounded-full"
-                                        />
-                                    )}
-                                </div>
+                                <img
+                                    src={getConversationAvatar(conversation)}
+                                    alt="Profile"
+                                    className="ml-2 inline-block h-8 w-8 rounded-full"
+                                />
                                 <div className="">
                                     <div className="cursor-auto">
                                         <div className="font-medium">
@@ -387,7 +428,7 @@ const Index = ({ auth, conversations, users }) => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 ml-auto mr-5">
+                                <div className="ml-auto mr-5 flex items-center gap-2">
                                     {auth.user.id === conversation.createdby ? (
                                         <button
                                             onClick={() => {
@@ -448,6 +489,6 @@ const Index = ({ auth, conversations, users }) => {
             )}
         </AuthenticatedLayout>
     );
-};;
+};
 
 export default Index;

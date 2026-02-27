@@ -2,7 +2,6 @@
 
 namespace App\Events;
 
-use App\Models\Message;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
@@ -12,39 +11,29 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class MessageSent implements ShouldBroadcastNow
+class MessageRead implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
      * Create a new event instance.
      */
+    public $conversationId;
+    public $userId;
 
-    public $message;
-
-    public function __construct($message)
+    public function __construct($conversationId, $userId)
     {
-        $this->message = $message->load('sender');
+        $this->conversationId = $conversationId;
+        $this->userId = $userId;
     }
 
     public function broadcastOn()
     {
-        return [
-            new PrivateChannel('chat.' . $this->message->conversation_id),
-            ...$this->message->conversation
-                ->users
-                ->map(fn($user) => new PrivateChannel('user.' . $user->id))
-                ->toArray(),
-            ];
+        return new PrivateChannel('chat.' . $this->conversationId);
     }
-    public function broadcastWith()
-    {
-        return [
-            'message' => $this->message->load('sender'),
-        ];
-    }
+
     public function broadcastAs()
     {
-        return 'message.sent';
+        return 'message.read';
     }
 }

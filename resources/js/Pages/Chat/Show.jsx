@@ -317,11 +317,11 @@ const Show = ({
                                         )}
 
                                         {/* Time */}
-                                        <div className="mt-1 flex justify-between text-right text-[10px] opacity-70">
+                                        <div className="mt-1 flex justify-around gap-3 align-bottom text-right text-[10px] opacity-70">
                                             {/* Sender Name (only group & not mine) */}
                                             {selectedConversation.is_group &&
                                                 !isMine && (
-                                                    <div className="mb-1 ml-1 text-xs font-semibold text-gray-300">
+                                                    <div className="mb-1 ml-1 text-xs font-semibold text-gray-100">
                                                         {msg.sender?.name}
                                                     </div>
                                                 )}
@@ -331,6 +331,11 @@ const Show = ({
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                             })}
+                                            {isMine && (
+                                                <span className="ml-2 text-xs text-sky-50">
+                                                    {msg.read_at ? 'read' : 'unread'}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

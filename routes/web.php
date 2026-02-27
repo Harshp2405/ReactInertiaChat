@@ -56,4 +56,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/chat/{conversation}/remove-member', [ChatController::class, 'removeMember']);
     });
 
+//Read chat
+Route::post('/conversations/{conversation}/read', [ChatController::class, 'markAsRead']);
+
+
 require __DIR__.'/auth.php';

@@ -15,8 +15,15 @@ return new class extends Migration
             $table->string('name')->nullable();
             $table->boolean('is_group')->default(false);
             $table->foreignId('created_by')->nullable()->constrained('users')->cascadeOnDelete();
+            $table->dropForeign(['user_one_id']);
+            $table->dropForeign(['user_two_id']);
 
-            $table->dropColumn(['user_one_id', 'user_two_id']); // remove old structure
+            // 2️⃣ Drop unique index (if exists)
+            $table->dropUnique(['user_one_id', 'user_two_id']);
+
+            // 3️⃣ Now drop columns
+            $table->dropColumn(['user_one_id', 'user_two_id']);
+            // $table->dropColumn(['user_one_id', 'user_two_id']); // remove old structure
         });
     }
 
