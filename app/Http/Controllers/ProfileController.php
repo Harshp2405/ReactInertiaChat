@@ -8,6 +8,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,6 +23,7 @@ class ProfileController extends Controller
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            'user' => $request->user(),
         ]);
     }
 
@@ -39,6 +42,37 @@ class ProfileController extends Controller
 
         return Redirect::route('profile.edit');
     }
+
+
+    /* Profile Image Update */
+
+
+    public function updateProfileImage(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'profile_image' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $user = $request->user();
+
+        // Delete old image if exists
+        if ($user->profile_image && Storage::disk('public')->exists($user->profile_image)) {
+            Storage::disk('public')->delete($user->profile_image);
+        }
+
+        // Store new image
+        $username = explode('@', $user->email)[0] ?? 'user';
+
+        $imagePath = $request->file('profile_image')
+            ->store("profile_images/{$username}", 'public');
+
+        // Save only profile_image field
+        $user->profile_image = $imagePath;
+        $user->save();
+
+        return Redirect::route('profile.edit');
+    }
+
 
     /**
      * Delete the user's account.

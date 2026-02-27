@@ -311,7 +311,7 @@ const Index = ({ auth, conversations, users }) => {
                     <div className="border-b p-4 font-semibold">
                         Conversations
                     </div>
-                    {console.log(conversationList)}
+                    
                     {conversationList
                         ?.filter((c) => c && c.conversation_id)
                         .map((conversation) => (
