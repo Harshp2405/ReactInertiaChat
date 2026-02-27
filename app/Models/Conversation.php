@@ -10,7 +10,8 @@ class Conversation extends Model
     protected $fillable = [
         'name',
         'is_group',
-        'created_by'
+        'created_by',
+        
     ];
     protected $casts = [
         'is_group' => 'boolean',

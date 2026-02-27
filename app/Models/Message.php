@@ -12,8 +12,9 @@ class Message extends Model
         'receiver_id',
         'body',
         'read_at',
+        'type'
     ];
-
+    
     protected $casts = [
         'read_at' => 'datetime',
     ];

@@ -11,6 +11,7 @@ class MessageAttachment extends Model
         'file_path',
         'file_type',
     ];
+    
 
     public function message()
     {

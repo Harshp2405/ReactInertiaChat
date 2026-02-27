@@ -4,27 +4,33 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 import Show from './Show';
 import CreateGroup from './CreateGroup';
+import { DeleteIcon, Trash } from 'lucide-react';
+import AddMemberModal from './AddMemberModal';
 
 const Index = ({ auth, conversations, users }) => {
     const [conversationList, setConversationList] = useState(
         conversations || [],
     );
-// console.log(conversationList);
+    // console.log(conversations);
+    // console.log(users)
+    
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [messages, setMessages] = useState([]);
     const [conversationId, setConversationId] = useState(null);
     const [sending, setSending] = useState(false);
 
-
-
-
     const [showGroupModal, setShowGroupModal] = useState(false);
 
+    const [showAddModal, setShowAddModal] = useState(false);
 
     const { data, setData } = useForm({
         body: '',
         file: [],
     });
+
+    const navigate = () => {
+        window.location.href = '/chats';
+    };
 
     /* ================= LOAD MESSAGES ================= */
     useEffect(() => {
@@ -38,6 +44,22 @@ const Index = ({ auth, conversations, users }) => {
             })
             .catch(console.error);
     }, [selectedConversation]);
+
+    /* ==========================Sort Conversetion ============================ */
+
+    const sortConversations = (list) => {
+        return [...list].sort((a, b) => {
+            const aTime = a.last_message?.created_at
+                ? new Date(a.last_message.created_at).getTime()
+                : 0;
+
+            const bTime = b.last_message?.created_at
+                ? new Date(b.last_message.created_at).getTime()
+                : 0;
+
+            return bTime - aTime; // newest first
+        });
+    };
 
     /* ================= SEND MESSAGE ================= */
     const sendMessage = async (e) => {
@@ -69,17 +91,13 @@ const Index = ({ auth, conversations, users }) => {
 
             // Move conversation to top
             setConversationList((prev) => {
-                const updated = prev.filter(
-                    (c) => c.conversation_id !== conversationId,
+                const newList = prev.map((c) =>
+                    c.conversation_id === conversationId
+                        ? { ...c, last_message: newMessage }
+                        : c,
                 );
 
-                const current = prev.find(
-                    (c) => c.conversation_id === conversationId,
-                );
-
-                if (!current) return prev;
-
-                return [{ ...current, last_message: newMessage }, ...updated];
+                return sortConversations(newList);
             });
 
             // Reset form
@@ -89,52 +107,68 @@ const Index = ({ auth, conversations, users }) => {
             });
         } catch (error) {
             console.error(error);
-    
+
             if (error.response) {
                 if (error.response.status === 422) {
-                    alert(error.response.data.error || "Message or file required");
+                    alert(
+                        error.response.data.error || 'Message or file required',
+                    );
                 } else if (error.response.status === 403) {
-                    alert("You are not allowed to send message.");
+                    alert('You are not allowed to send message.');
                 } else {
-                    alert("Server error. Please try again.");
+                    alert('Server error. Please try again.');
                 }
             } else {
-                alert("Network error. Check your connection.");
+                alert('Network error. Check your connection.');
             }
-        }finally {
+        } finally {
             setSending(false);
         }
     };
 
-    /* ================= REALTIME ================= */
+    /*==============================  latest Chat ============================================== */
     useEffect(() => {
-        if (!conversationId) return;
+        if (!auth?.user?.id) return;
 
-        const channel = window.Echo.private(`chat.${conversationId}`);
+        /* ================= USER CHANNEL ================= */
+        const userChannel = window.Echo.private(`user.${auth.user.id}`);
 
-        channel.listen('.message.sent', (e) => {
-            setMessages((prev) => [...prev, e.message]);
+        userChannel.listen('.group.created', (e) => {
+            const newConversation = {
+                conversation_id: e.conversation.id,
+                name: e.conversation.name,
+                is_group: true,
+                users: e.conversation.users,
+                last_message: null,
+            };
 
             setConversationList((prev) => {
-                const updated = prev.filter(
-                    (c) => c.conversation_id !== e.message.conversation_id,
+                const exists = prev.find(
+                    (c) => c.conversation_id === e.conversation.id,
                 );
 
-                const current = prev.find(
-                    (c) => c.conversation_id === e.message.conversation_id,
-                );
+                if (exists) return prev;
 
-                if (!current) return prev;
-
-                return [{ ...current, last_message: e.message }, ...updated];
+                return [
+                    {
+                        conversation_id: e.conversation.id,
+                        name: e.conversation.name,
+                        is_group: true,
+                        users: e.conversation.users,
+                        last_message: null,
+                    },
+                    ...prev,
+                ];
             });
         });
 
+        /* ================= CLEANUP ================= */
         return () => {
-            window.Echo.leave(`chat.${conversationId}`);
+            window.Echo.leave(`user.${auth.user.id}`);
         };
-    }, [conversationId]);
-    /* ==================Start New Chat================ */
+    }, [auth.user.id]);
+
+    /* ========================================Start New Chat================ */
     const startChat = async (userId) => {
         try {
             const res = await axios.post(`/chat/start/${userId}`);
@@ -165,7 +199,8 @@ const Index = ({ auth, conversations, users }) => {
             console.error(err);
         }
     };
-    /*Filter Exist Conversition======================== */
+
+    /*=======================================Filter Exist Conversition======================== */
     const existingUserIds =
         conversationList
             ?.filter((c) => !c.is_group) // only private chats
@@ -174,12 +209,79 @@ const Index = ({ auth, conversations, users }) => {
             ) || [];
 
     /*========================createGroup======================= */
-    
+    useEffect(() => {
+        if (!conversationId) return;
+
+        const channel = window.Echo.private(`chat.${conversationId}`);
+
+        channel.listen('.message.sent', (e) => {
+            setMessages((prev) => {
+                // Prevent duplicate by ID check
+                const exists = prev.find((m) => m.id === e.message.id);
+                if (exists) return prev;
+
+                return [...prev, e.message];
+            });
+
+            setConversationList((prev) => {
+                const newList = prev.map((c) =>
+                    c.conversation_id === e.message.conversation_id
+                        ? { ...c, last_message: e.message }
+                        : c,
+                );
+
+                return sortConversations(newList);
+            });
+        });
+
+        return () => {
+            window.Echo.leave(`chat.${conversationId}`);
+        };
+    }, [conversationId]);
+
+    /* ==================================Delete Group=================================== */
+
+    const handleDeleteGroup = async (id) => {
+        if (!confirm('Are you sure you want to delete this group?')) return;
+
+        alert('Group deleted successfully');
+
+        try {
+            await axios.delete(`/chat/${id}/delete`);
+
+            // Remove from sidebar
+            setConversationList((prev) =>
+                prev.filter((c) => c.conversation_id !== id),
+            );
+            navigate();
+            setSelectedConversation(null);
+            setMessages([]);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to delete group');
+        }
+    };
+
     return (
         <AuthenticatedLayout>
             {/* Create Group */}
-
-            <div className="flex justify-end border-b bg-white p-3">
+           
+            <div className="flex justify-between border-b bg-white p-3">
+                <div>
+                    {auth.user.profile_image !== null ? (
+                        <img
+                            src={`/storage/${auth.user.profile_image}`}
+                            alt="Profile"
+                            className="ml-2 inline-block h-8 w-8 rounded-full"
+                        />
+                    ) : (
+                        <img
+                            src={`/storage/profile_images/defaultimage/default.webp`}
+                            alt="Profile"
+                            className="ml-2 inline-block h-8 w-8 rounded-full"
+                        />
+                    )}
+                </div>
                 <button
                     onClick={() => setShowGroupModal(true)}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
@@ -205,53 +307,102 @@ const Index = ({ auth, conversations, users }) => {
                         ))}
                 </div>
                 {/* ================= CONVERSATION LIST ================= */}
-                <div className="w-1/3 overflow-y-auto border-r bg-gray-50">
+                <div className="w-1/5 overflow-auto border-r bg-gray-50">
                     <div className="border-b p-4 font-semibold">
                         Conversations
                     </div>
-
+                    {console.log(conversationList)}
                     {conversationList
                         ?.filter((c) => c && c.conversation_id)
                         .map((conversation) => (
                             <div
-                                key={conversation.conversation_id}
                                 onClick={() =>
                                     setSelectedConversation(conversation)
                                 }
-                                className={`cursor-pointer border-b p-4 hover:bg-gray-100 ${
+                                key={conversation.conversation_id}
+                                className={`flex flex-row gap-5 justify-start border-b p-2 ${
+                                // className={`grid grid-cols-12 gap-2 justify-between border-b p-4 ${
                                     selectedConversation?.conversation_id ===
                                     conversation.conversation_id
-                                        ? 'bg-gray-200'
+                                        ? 'bg-gray-300'
                                         : ''
                                 }`}
                             >
-                                <div className="font-medium">
-                                    {conversation.is_group
-                                        ? conversation.name
-                                        : conversation.users?.find(
-                                              (u) => u.id !== auth.user.id,
-                                          )?.name}
-                                </div>
-
-                                <div className="truncate text-sm text-gray-500">
-                                    {conversation.last_message ? (
-                                        conversation.is_group ? (
-                                            <>
-                                                <span className="font-medium">
-                                                    {
-                                                        conversation
-                                                            .last_message.sender
-                                                            ?.name
-                                                    }
-                                                    :
-                                                </span>{' '}
-                                                {conversation.last_message.body}
-                                            </>
-                                        ) : (
-                                            conversation.last_message.body
-                                        )
+                                <div className="">
+                                    {conversation.users[0].profile_image !==
+                                    null ? (
+                                        <img
+                                            src={`/storage/${
+                                                conversation.users[0]
+                                                    .profile_image
+                                            }`}
+                                            alt="Profile"
+                                            className="ml-2 inline-block h-8 w-8 rounded-full"
+                                        />
                                     ) : (
-                                        'No messages yet'
+                                        <img
+                                            src={`/storage/profile_images/defaultimage/default.webp`}
+                                            alt="Profile"
+                                            className="ml-2 inline-block h-8 w-8 rounded-full"
+                                        />
+                                    )}
+                                </div>
+                                <div className="">
+                                    <div className="cursor-auto">
+                                        <div className="font-medium">
+                                            {conversation.is_group
+                                                ? conversation.name
+                                                : conversation.users?.find(
+                                                      (u) =>
+                                                          u.id !== auth.user.id,
+                                                  )?.name}
+                                        </div>
+
+                                        <div className="truncate text-sm text-gray-500">
+                                            {conversation.last_message ? (
+                                                conversation.is_group ? (
+                                                    <>
+                                                        <span className="font-medium">
+                                                            {
+                                                                conversation
+                                                                    .last_message
+                                                                    .sender
+                                                                    ?.name
+                                                            }
+                                                            :
+                                                        </span>{' '}
+                                                        {
+                                                            conversation
+                                                                .last_message
+                                                                .body
+                                                        }
+                                                    </>
+                                                ) : (
+                                                    conversation.last_message
+                                                        .body
+                                                )
+                                            ) : (
+                                                'No messages yet'
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 ml-auto mr-5">
+                                    {auth.user.id === conversation.createdby ? (
+                                        <button
+                                            onClick={() => {
+                                                handleDeleteGroup(
+                                                    conversation.conversation_id,
+                                                );
+                                                console.log(
+                                                    `delete ${conversation.conversation_id}`,
+                                                );
+                                            }}
+                                        >
+                                            <Trash className="h-5 w-5 text-red-500" />
+                                        </button>
+                                    ) : (
+                                        ''
                                     )}
                                 </div>
                             </div>
@@ -267,6 +418,11 @@ const Index = ({ auth, conversations, users }) => {
                     setData={setData}
                     sendMessage={sendMessage}
                     processing={sending}
+                    setConversationList={setConversationList}
+                    setSelectedConversation={setSelectedConversation}
+                    setMessages={setMessages}
+                    users={users}
+                    setShowAddModal={setShowAddModal}
                 />
             </div>
 
@@ -280,8 +436,18 @@ const Index = ({ auth, conversations, users }) => {
                     setSelectedConversation={setSelectedConversation}
                 />
             ) : null}
+
+            {showAddModal && (
+                <AddMemberModal
+                    users={users}
+                    setShowAddModal={setShowAddModal}
+                    selectedConversation={selectedConversation}
+                    setConversationList={setConversationList}
+                    setMessages={setMessages}
+                />
+            )}
         </AuthenticatedLayout>
     );
-};
+};;
 
 export default Index;

@@ -102,6 +102,31 @@ export default function Register() {
                     />
                 </div>
 
+                <div className="mt-4">
+                    <InputLabel htmlFor="profile_image" value="Profile Image" />
+
+                    <input
+                        id="profile_image"
+                        type="file"
+                        required
+                        name="profile_image"
+                        // value={data.profile_image}
+                        className="mt-1 block w-full"
+                        onChange={(e) =>
+                            setData({
+                                ...data,
+                                profile_image: e.target.files[0],
+                            })
+                        }
+                        
+                    />
+
+                    <InputError
+                        message={errors.profile_image}
+                        className="mt-2"
+                    />
+                </div>
+
                 <div className="mt-4 flex items-center justify-end">
                     <Link
                         href={route('login')}

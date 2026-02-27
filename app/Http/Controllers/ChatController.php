@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\GroupCreated;
 use App\Events\MessageSent;
 use App\Models\Conversation;
 use App\Models\User;
@@ -35,16 +36,18 @@ class ChatController extends Controller
                     'name' => $conversation->name,
                     'is_group' => $conversation->is_group,
                     'users' => $conversation->users,
+                    'createdby'=>$conversation->created_by,
                     'last_message' => $conversation->lastMessage
                 ];
-            });
+            })->sortBy(function ($conversation) {
+                return $conversation['last_message'] ? $conversation['last_message']['created_at'] : null;
+            }, SORT_REGULAR, true)->values();
 
         return Inertia::render('Chat/Index', [
             'conversations' => $conversations,
             'users' => User::where('id', '!=', auth()->id())->get()
         ]);
     }
-
 
     public function show(Conversation $conversation)
     {
@@ -133,6 +136,8 @@ class ChatController extends Controller
 
         $conversation->load('users');
 
+        broadcast(new GroupCreated($conversation))->toOthers();
+
         return response()->json([
             'conversation' => [
                 'conversation_id' => $conversation->id,
@@ -143,6 +148,7 @@ class ChatController extends Controller
             ]
         ]);
     }
+
     public function startConversation(User $user)
     {
         $authUser = auth()->user();
@@ -176,6 +182,185 @@ class ChatController extends Controller
 
         return response()->json([
             'conversation_id' => $conversation->id
+        ]);
+    }
+
+
+    public function leaveGroup(Conversation $conversation)
+    {
+        $user = auth()->user();
+
+        if (!$conversation->is_group) {
+            return response()->json(['error' => 'Not a group'], 400);
+        }
+
+        if (!$conversation->users->contains($user->id)) {
+            return response()->json(['error' => 'Not a member'], 403);
+        }
+
+        DB::transaction(function () use ($conversation, $user) {
+
+            // Remove user from group
+            $conversation->users()->detach($user->id);
+
+            // Reload members
+            $conversation->load('users');
+
+            // 2️⃣ If no members left → delete entire group
+            if ($conversation->users->count() === 0) {
+
+                // Delete messages
+                $conversation->messages()->delete();
+
+                // Delete conversation
+                $conversation->delete();
+
+                return;
+            }
+
+            // Create system message
+            $message = $conversation->messages()->create([
+                'sender_id' => $user->id,
+                'body' => $user->name . ' left the group',
+                'type' => 'system' // optional column if you want
+            ]);
+
+            $message->load('sender');
+
+            broadcast(new MessageSent($message))->toOthers();
+        });
+
+        return response()->json([
+            'success' => true,
+            'conversation_id' => $conversation->id
+        ]);
+    }
+
+    public function deleteGroup(Conversation $conversation)
+    {
+        $user = auth()->user();
+
+        if (!$conversation->is_group) {
+            return response()->json(['error' => 'Not a group'], 400);
+        }
+
+        if (!$conversation->users->contains($user->id)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        DB::transaction(function () use ($conversation) {
+
+            $conversationId = $conversation->id;
+
+            // Broadcast delete event BEFORE deleting
+            // broadcast(new GroupDeleted($conversationId))->toOthers();
+
+            // Delete conversation (cascade will remove messages + pivot)
+            $conversation->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'conversation_id' => $conversation->id
+        ]);
+    }
+
+    public function addMembers(Request $request, Conversation $conversation)
+    {
+        $request->validate([
+            'users' => 'required|array|min:1',
+            'users.*' => 'exists:users,id'
+        ]);
+
+        $authUser = auth()->user();
+
+        if (!$conversation->is_group) {
+            return response()->json(['error' => 'Not a group'], 400);
+        }
+
+        // Only admin can add
+        if ($conversation->created_by !== $authUser->id) {
+            return response()->json(['error' => 'Only admin can add members'], 403);
+        }
+
+        $existingUserIds = $conversation->users()->pluck('users.id')->toArray();
+
+        $newUserIds = array_diff($request->users, $existingUserIds);
+
+        if (empty($newUserIds)) {
+            return response()->json(['error' => 'Users already in group'], 422);
+        }
+
+        // Attach new users
+        $conversation->users()->attach($newUserIds);
+
+        $conversation->load('users');
+
+        // Create system message
+        $addedUsers = User::whereIn('id', $newUserIds)->pluck('name')->implode(', ');
+
+        $systemMessage = $conversation->messages()->create([
+            'sender_id' => $authUser->id,
+            'body' => "{$authUser->name} added {$addedUsers} to the group",
+            'type' => 'system'
+        ]);
+
+        $systemMessage->load('sender');
+
+        broadcast(new MessageSent($systemMessage))->toOthers();
+
+        return response()->json([
+            'conversation' => $conversation,
+            'message' => $systemMessage
+        ]);
+    }
+
+    public function removeMember(Request $request, Conversation $conversation)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id'
+        ]);
+
+        $authUser = auth()->user();
+
+        if (!$conversation->is_group) {
+            return response()->json(['error' => 'Not a group'], 400);
+        }
+
+        // ✅ Only admin can remove
+        if ($conversation->created_by !== $authUser->id) {
+            return response()->json(['error' => 'Only admin can remove members'], 403);
+        }
+
+        // ❌ Prevent admin removing himself
+        if ($request->user_id == $authUser->id) {
+            return response()->json(['error' => 'Admin cannot remove himself'], 400);
+        }
+
+        // ❌ Prevent removing non-member
+        if (!$conversation->users()->where('users.id', $request->user_id)->exists()) {
+            return response()->json(['error' => 'User not in group'], 400);
+        }
+
+        $removedUser = User::find($request->user_id);
+
+        // Remove from pivot
+        $conversation->users()->detach($request->user_id);
+
+        // Create system message
+        $systemMessage = $conversation->messages()->create([
+            'sender_id' => $authUser->id,
+            'body' => "{$authUser->name} removed {$removedUser->name} from the group",
+            'type' => 'system'
+        ]);
+
+        $systemMessage->load('sender');
+
+        broadcast(new MessageSent($systemMessage))->toOthers();
+
+        return response()->json([
+            'message' => $systemMessage,
+            'removed_user_id' => $request->user_id
         ]);
     }
 }

@@ -25,8 +25,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
 
-
-
     // Route::get('/chat/{user}', [ChatController::class, 'show'])
     //     ->name('chat.show');
 
@@ -40,10 +38,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/chat/conversation/{conversation}', [ChatController::class, 'show'])
         ->name('chat.show');
 
-    Route::post('/chat/group/create', [ChatController::class, 'createGroup'])
-        ->name('chat.group.create');
-
     Route::post('/chat/start/{user}', [ChatController::class, 'startConversation']);
-});
+        
+    Route::post('/chat/group/create', [ChatController::class, 'createGroup'])
+            ->name('chat.group.create');
+// Leave Group
+    Route::post('/chat/{conversation}/leave', [ChatController::class, 'leaveGroup']);
+
+    // Delete group 
+    Route::delete('/chat/{conversation}/delete', [ChatController::class, 'deleteGroup']);
+
+    // Add Members
+    Route::post('/chat/{conversation}/add-members', [ChatController::class, 'addMembers']);
+
+    // Remove Member
+    Route::post('/chat/{conversation}/remove-member', [ChatController::class, 'removeMember']);
+    });
 
 require __DIR__.'/auth.php';

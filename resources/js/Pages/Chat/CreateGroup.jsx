@@ -22,7 +22,7 @@ const CreateGroup = ({
 
             const newConversation = res.data.conversation;
 
-            console.log(res);
+
             setConversationList((prev) => [newConversation, ...prev]);
             setSelectedConversation(newConversation);
 
@@ -34,6 +34,7 @@ const CreateGroup = ({
             console.error(err);
         } finally {
             setShowGroupModal(false);
+            return;
         }
     };
     return (

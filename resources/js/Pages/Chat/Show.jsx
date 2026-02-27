@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { Download, PaperclipIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -9,10 +10,19 @@ const Show = ({
     setData,
     sendMessage,
     processing,
+    setConversationList,
+    setSelectedConversation,
+    setMessages,
+    users,
+    setShowAddModal,
 }) => {
     const [previewUrl, setPreviewUrl] = useState(null);
     const bottomRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    const [showGroupInfo, setShowGroupInfo] = useState(false);
+
+    // console.log(selectedConversation);
 
     /* Auto Scroll */
     useEffect(() => {
@@ -76,28 +86,164 @@ const Show = ({
         clearPreview();
     };
 
+    /* =================================Leave Group ================================ */
+
+    const handleLeaveGroup = async () => {
+        if (!selectedConversation) return;
+
+        if (!confirm('Are you sure you want to leave this group?')) return;
+
+        try {
+            if (auth.user.id === selectedConversation.createdby) {
+                if (!confirm('Are you sure you want to delete this group?'))
+                    return;
+                await axios.delete(
+                    `/chat/${selectedConversation.conversation_id}/delete`,
+                );
+            } else {
+                await axios.post(
+                    `/chat/${selectedConversation.conversation_id}/leave`,
+                );
+            }
+
+            // Remove group from sidebar
+            setConversationList((prev) =>
+                prev.filter(
+                    (c) =>
+                        c.conversation_id !==
+                        selectedConversation.conversation_id,
+                ),
+            );
+        } catch (err) {
+            console.error(err);
+            // alert('Failed to leave group');
+
+            return;
+        } finally {
+            setSelectedConversation(null);
+            setMessages([]);
+            return;
+        }
+    };
+
+    /*===================================Remove user===================================== */
+
+    const handleRemoveMember = async (userId) => {
+        if (!confirm('Remove this member?')) return;
+
+        try {
+            const res = await axios.post(
+                `/chat/${selectedConversation.conversation_id}/remove-member`,
+                { user_id: userId },
+            );
+
+            // Update member list in conversationList
+            setConversationList((prev) =>
+                prev.map((c) =>
+                    c.conversation_id === selectedConversation.conversation_id
+                        ? {
+                              ...c,
+                              users: c.users.filter((u) => u.id !== userId),
+                          }
+                        : c,
+                ),
+            );
+
+            // Add system message
+            setMessages((prev) => [...prev, res.data.message]);
+            console.log(userId, ' Remove');
+        } catch (err) {
+            console.error(err);
+            alert('Failed to remove member');
+        } finally {
+            setShowGroupInfo(false);
+            return;
+        }
+    };
+
     return (
         <div className="flex flex-1 flex-col">
             {selectedConversation ? (
                 <>
                     {/* Header */}
                     <div className="border-b bg-gray-100 p-4">
-                        <div className="text-lg font-semibold">
-                            {selectedConversation.name}
-                        </div>
+                        <div className="flex items-center justify-between border-b bg-gray-100 p-4">
+                            <div
+                                onClick={() =>
+                                    selectedConversation.is_group
+                                        ? (console.log(selectedConversation),
+                                          setShowGroupInfo(true))
+                                        : ' '
+                                }
+                                className="cursor-pointer"
+                            >
+                                <div className="font-semibold">
+                                    {selectedConversation.name}
+                                </div>
 
-                        {selectedConversation.is_group && (
-                            <div className="mt-1 truncate text-sm text-gray-600">
-                                {selectedConversation.users
-                                    ?.map((user) => user.name)
-                                    .join(', ')}
+                                {selectedConversation.is_group && (
+                                    <div>
+                                        {auth.user.id ===
+                                        selectedConversation.createdby
+                                            ? 'Admin'
+                                            : 'Created By: ' +
+                                              selectedConversation.users.find(
+                                                  (u) =>
+                                                      u.id ===
+                                                      selectedConversation.createdby,
+                                              )?.name}
+                                    </div>
+                                )}
+
+                                {selectedConversation.is_group && (
+                                    <div className="text-xs text-gray-500">
+                                        {selectedConversation.users
+                                            ?.map((u) => u.name)
+                                            .join(', ')}
+                                    </div>
+                                )}
                             </div>
-                        )}
+
+                            {selectedConversation.is_group && (
+                                <div className="flex gap-2">
+                                    {auth.user.id ===
+                                        selectedConversation.createdby && (
+                                        <button
+                                            onClick={() => {
+                                                setShowAddModal(true);
+                                            }}
+                                            className="rounded bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                                        >
+                                            Add Member to Group
+                                        </button>
+                                    )}
+
+                                    <button
+                                        onClick={handleLeaveGroup}
+                                        className="rounded bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
+                                    >
+                                        Leave Group
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Messages */}
+
                     <div className="flex-1 space-y-2 overflow-y-auto bg-gray-50 p-4">
                         {messages.map((msg) => {
+                            if (msg.type === 'system') {
+                                return (
+                                    <div
+                                        key={msg.id}
+                                        className="my-2 text-center text-sm text-gray-500"
+                                    >
+                                        {msg.body}
+                                    </div>
+                                );
+                            }
+
                             const isMine = msg.sender_id === auth.user.id;
 
                             return (
@@ -185,7 +331,6 @@ const Show = ({
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                             })}
-
                                         </div>
                                     </div>
                                 </div>
@@ -257,6 +402,70 @@ const Show = ({
             ) : (
                 <div className="flex flex-1 items-center justify-center text-gray-400">
                     Select a conversation to start chatting
+                </div>
+            )}
+
+            {/* Group Info Modal */}
+            {showGroupInfo && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="w-full rounded-lg bg-white p-6 md:w-1/2">
+                        <h2 className="mb-4 text-xl font-bold">
+                            {selectedConversation.name} - Group Info
+                        </h2>
+
+                        {/* CREATED BY */}
+                        <p className="mb-4">
+                            <strong>Admin:</strong>{' '}
+                            {selectedConversation.users.find(
+                                (u) => u.id === selectedConversation.createdby,
+                            )?.name || 'Unknown'}
+                        </p>
+
+                        {/* MEMBERS LIST */}
+                        <div className="mb-4">
+                            <strong>Members:</strong>
+
+                            <div className="mt-2 space-y-2">
+                                {selectedConversation.users?.map((user) => (
+                                    <div
+                                        key={user.id}
+                                        className="flex items-center justify-between rounded border px-3 py-2"
+                                    >
+                                        <span>
+                                            {user.name}
+                                            {user.id ===
+                                                selectedConversation.createdby &&
+                                                ' (Admin)'}
+                                        </span>
+
+                                        {/* REMOVE BUTTON - ADMIN ONLY */}
+                                        {auth.user.id ===
+                                            selectedConversation.createdby &&
+                                            user.id !== auth.user.id && (
+                                                <button
+                                                    onClick={() =>
+                                                        handleRemoveMember(
+                                                            user.id,
+                                                        )
+                                                    }
+                                                    className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* CLOSE BUTTON */}
+                        <button
+                            onClick={() => setShowGroupInfo(false)}
+                            className="rounded bg-blue-500 px-3 py-2 text-white"
+                        >
+                            Close
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
