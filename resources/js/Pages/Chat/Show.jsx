@@ -22,7 +22,7 @@ const Show = ({
 
     const [showGroupInfo, setShowGroupInfo] = useState(false);
 
-    // console.log(selectedConversation);
+    // console.log(messages);
 
     /* Auto Scroll */
     useEffect(() => {
@@ -230,7 +230,7 @@ const Show = ({
                     </div>
 
                     {/* Messages */}
-
+                    
                     <div className="flex-1 space-y-2 overflow-y-auto bg-gray-50 p-4">
                         {messages.map((msg) => {
                             if (msg.type === 'system') {

@@ -38,11 +38,14 @@ class ChatController extends Controller
                     'is_group' => $conversation->is_group,
                     'users' => $conversation->users,
                     'createdby'=>$conversation->created_by,
-                    'last_message' => $conversation->lastMessage
+                    'last_message' => $conversation->lastMessage,
+                    'unreadCount'=>$conversation->messages()->whereNull("read_at")->where("sender_id" , "!=" , auth()->id())->count()
                 ];
             })->sortBy(function ($conversation) {
                 return $conversation['last_message'] ? $conversation['last_message']['created_at'] : null;
             }, SORT_REGULAR, true)->values();
+
+
 
         return Inertia::render('Chat/Index', [
             'conversations' => $conversations,
@@ -66,13 +69,6 @@ class ChatController extends Controller
             ->get()
             ->values();
             
-        //     $conversation->messages()
-        //         ->whereNull('read_at')
-        //         ->where('sender_id', '!=', auth()->id())
-        //         ->update([
-        //             'read_at' => now()
-        //         ]);
-        // broadcast(new MessageRead($conversation->id, auth()->id()))->toOthers();
 
         $this->markAsRead($conversation);
 

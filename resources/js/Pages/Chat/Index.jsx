@@ -142,9 +142,18 @@ const Index = ({ auth, conversations, users }) => {
                 const updated = prev.map((c) => {
                     if (c.conversation_id === newMessage.conversation_id) {
                         exists = true;
+
+                        const isOpen =
+                            selectedConversation?.conversation_id ===
+                            newMessage.conversation_id;
+
                         return {
                             ...c,
                             last_message: newMessage,
+                            unreadCount:
+                                newMessage.sender_id !== auth.user.id && !isOpen
+                                    ? (c.unreadCount || 0) + 1
+                                    : 0,
                         };
                     }
                     return c;
@@ -158,6 +167,7 @@ const Index = ({ auth, conversations, users }) => {
                         is_group: false,
                         users: [],
                         last_message: newMessage,
+                        unreadCount: 1,
                     });
                 }
 
@@ -169,10 +179,6 @@ const Index = ({ auth, conversations, users }) => {
                 selectedConversation?.conversation_id ===
                 newMessage.conversation_id
             ) {
-
-
-                
-
                 setMessages((prev) => {
                     const exists = prev.find((m) => m.id === newMessage.id);
                     if (exists) return prev;
@@ -260,10 +266,12 @@ const Index = ({ auth, conversations, users }) => {
             }
         });
 
-        // Double tick logic
+        // Double tick logic and Read Unread
 
         channel.listen('.message.read', (e) => {
+            const conversationId = e.conversation_id;
 
+            /* ================= UPDATE MESSAGE LIST ================= */
             setMessages((prev) =>
                 prev.map((msg) =>
                     msg.sender_id === auth.user.id && !msg.read_at
@@ -271,6 +279,7 @@ const Index = ({ auth, conversations, users }) => {
                         : msg,
                 ),
             );
+
         });
 
         return () => {
@@ -366,13 +375,23 @@ const Index = ({ auth, conversations, users }) => {
                     <div className="border-b p-4 font-semibold">
                         Conversations
                     </div>
-
+                    {console.log(conversationList)}
                     {conversationList
                         ?.filter((c) => c && c.conversation_id)
                         .map((conversation) => (
                             <div
                                 onClick={() =>
-                                    setSelectedConversation(conversation)
+                                
+                                    (setSelectedConversation(conversation),
+                                        setConversationList((prev) =>
+                                            prev.map((c) =>
+                                                c.conversation_id ===
+                                                conversation.conversation_id
+                                                    ? { ...c, unreadCount: 0 }
+                                                    : c,
+                                            ),
+                                        ))
+                                
                                 }
                                 key={conversation.conversation_id}
                                 className={`flex flex-row justify-start gap-5 border-b p-2 ${
@@ -427,6 +446,13 @@ const Index = ({ auth, conversations, users }) => {
                                             )}
                                         </div>
                                     </div>
+                                </div>
+                                <div>
+                                    {conversation.unreadCount > 0 && (
+                                        <span className="items-center justify-end rounded-full bg-red-600 px-2 py-1 text-xs font-bold leading-none text-white">
+                                            {conversation.unreadCount}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="ml-auto mr-5 flex items-center gap-2">
                                     {auth.user.id === conversation.createdby ? (
