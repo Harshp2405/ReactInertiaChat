@@ -11,8 +11,6 @@ const Index = ({ auth, conversations, users }) => {
     const [conversationList, setConversationList] = useState(
         conversations || [],
     );
-    // console.log(conversations);
-    // console.log(users)
 
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [messages, setMessages] = useState([]);
