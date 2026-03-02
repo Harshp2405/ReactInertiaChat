@@ -251,16 +251,13 @@ const Show = ({
                         </div>
 
                         {!selectedConversation.is_group && (
-                            <p style={{ fontSize: 13, color: 'gray' }}>
-                                {isOnline ? (
-                                    <p style={{ fontSize: 15, color: 'green' }}>
-                                        Online
-                                    </p>
-                                ) : (
-                                    <p style={{ fontSize: 15, color: 'red' }}>
-                                        Offline
-                                    </p>
-                                )}
+                            <p
+                                style={{
+                                    fontSize: 15,
+                                    color: isOnline ? 'green' : 'red',
+                                }}
+                            >
+                                {isOnline ? 'Online' : 'Offline'}
                             </p>
                         )}
                     </div>
@@ -367,13 +364,14 @@ const Show = ({
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                             })}
-                                            
+
                                             {isMine && (
                                                 <span className="ml-2 text-xs text-sky-50">
-                                                    {msg.is_deleted == false ? (msg.read_at
-                                                        ? 'read'
-                                                        : 'unread') :( " " )}
-                                                    {}
+                                                    {msg.is_deleted == false
+                                                        ? msg.read_at
+                                                            ? 'read'
+                                                            : 'unread'
+                                                        : ' '}
                                                 </span>
                                             )}
                                             {/* Delete */}

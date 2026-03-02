@@ -24,7 +24,6 @@ const Index = ({ auth, conversations, users }) => {
 
     const [onlineUsers, setOnlineUsers] = useState([]);
 
-
     const { data, setData } = useForm({
         body: '',
         file: [],
