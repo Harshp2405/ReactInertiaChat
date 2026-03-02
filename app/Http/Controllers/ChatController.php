@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Events\GroupCreated;
+use App\Events\MessageDeleted;
 use App\Events\MessageRead;
 use App\Events\MessageSent;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +41,9 @@ class ChatController extends Controller
                     'users' => $conversation->users,
                     'createdby'=>$conversation->created_by,
                     'last_message' => $conversation->lastMessage,
-                    'unreadCount'=>$conversation->messages()->whereNull("read_at")->where("sender_id" , "!=" , auth()->id())->count()
+                    'unreadCount'=>$conversation->messages()->whereNull("read_at")->where("sender_id" , "!=" , auth()->id())
+                    ->where("is_deleted" , "!=" , "1")
+                    ->count()
                 ];
             })->sortBy(function ($conversation) {
                 return $conversation['last_message'] ? $conversation['last_message']['created_at'] : null;
@@ -192,7 +196,6 @@ class ChatController extends Controller
             'conversation_id' => $conversation->id
         ]);
     }
-
 
     public function leaveGroup(Conversation $conversation)
     {
@@ -390,5 +393,28 @@ class ChatController extends Controller
         broadcast(new MessageRead($conversation->id, $authId))->toOthers();
 
         return response()->json(['success' => true]);
+    }
+
+    public function deleteForEveryone(Message $message)
+    {
+        $authUser = auth()->user();
+
+        // Only sender can delete
+        if ($message->sender_id !== $authUser->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Update message
+        $message->update([
+            'is_deleted' => true,
+            'deleted_at' => now(),
+            'body' => null
+        ]);
+
+        broadcast(new MessageDeleted($message))->toOthers();
+
+        return response()->json([
+            'message_id' => $message->id
+        ]);
     }
 }

@@ -21,6 +21,10 @@ const Index = ({ auth, conversations, users }) => {
 
     const [showAddModal, setShowAddModal] = useState(false);
 
+
+    const [onlineUsers, setOnlineUsers] = useState([]);
+
+
     const { data, setData } = useForm({
         body: '',
         file: [],
@@ -324,6 +328,32 @@ const Index = ({ auth, conversations, users }) => {
             : '/storage/profile_images/defaultimage/default.webp';
     };
 
+    /* =====================================Online Status ============================================== */
+
+    useEffect(() => {
+        const channel = window.Echo.join('online')
+
+            .here((users) => {
+                setOnlineUsers(users);
+            })
+
+            .joining((user) => {
+                setOnlineUsers((prev) => {
+                    if (prev.find((u) => u.id === user.id)) return prev;
+                    return [...prev, user];
+                });
+            })
+
+            .leaving((user) => {
+                setOnlineUsers((prev) => prev.filter((u) => u.id !== user.id));
+            });
+
+
+        return () => {
+            window.Echo.leave('online');
+        };
+    }, []);
+
     return (
         <AuthenticatedLayout>
             {/* Create Group */}
@@ -373,24 +403,21 @@ const Index = ({ auth, conversations, users }) => {
                     <div className="border-b p-4 font-semibold">
                         Conversations
                     </div>
-                    {console.log(conversationList)}
                     {conversationList
                         ?.filter((c) => c && c.conversation_id)
                         .map((conversation) => (
                             <div
-                                onClick={() =>
-                                
-                                    (setSelectedConversation(conversation),
-                                        setConversationList((prev) =>
-                                            prev.map((c) =>
-                                                c.conversation_id ===
-                                                conversation.conversation_id
-                                                    ? { ...c, unreadCount: 0 }
-                                                    : c,
-                                            ),
-                                        ))
-                                
-                                }
+                                onClick={() => (
+                                    setSelectedConversation(conversation),
+                                    setConversationList((prev) =>
+                                        prev.map((c) =>
+                                            c.conversation_id ===
+                                            conversation.conversation_id
+                                                ? { ...c, unreadCount: 0 }
+                                                : c,
+                                        ),
+                                    )
+                                )}
                                 key={conversation.conversation_id}
                                 className={`flex flex-row justify-start gap-5 border-b p-2 ${
                                     // className={`grid grid-cols-12 gap-2 justify-between border-b p-4 ${
@@ -415,7 +442,7 @@ const Index = ({ auth, conversations, users }) => {
                                                           u.id !== auth.user.id,
                                                   )?.name}
                                         </div>
-
+                                        
                                         <div className="truncate text-sm text-gray-500">
                                             {conversation.last_message ? (
                                                 conversation.is_group ? (
@@ -447,11 +474,12 @@ const Index = ({ auth, conversations, users }) => {
                                 </div>
                                 <div>
                                     {conversation.unreadCount > 0 && (
-                                        <span className="items-center justify-end rounded-full bg-red-600 px-2 py-1 text-xs font-bold leading-none text-white">
+                                        <span className="items-center justify-end rounded-full bg-green-600 px-2 py-1 text-xs font-bold leading-none text-white">
                                             {conversation.unreadCount}
                                         </span>
                                     )}
                                 </div>
+
                                 <div className="ml-auto mr-5 flex items-center gap-2">
                                     {auth.user.id === conversation.createdby ? (
                                         <button
@@ -486,8 +514,9 @@ const Index = ({ auth, conversations, users }) => {
                     setConversationList={setConversationList}
                     setSelectedConversation={setSelectedConversation}
                     setMessages={setMessages}
-                    users={users}
+                    // users={users}
                     setShowAddModal={setShowAddModal}
+                    onlineUsers={onlineUsers}
                 />
             </div>
 

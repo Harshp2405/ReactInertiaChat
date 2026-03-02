@@ -12,7 +12,9 @@ class Message extends Model
         'receiver_id',
         'body',
         'read_at',
-        'type'
+        'type',
+        'is_deleted',
+        'deleted_at',
     ];
     
     protected $casts = [

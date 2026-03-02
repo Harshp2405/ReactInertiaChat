@@ -40,10 +40,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('chat.show');
 
     Route::post('/chat/start/{user}', [ChatController::class, 'startConversation']);
-        
+
     Route::post('/chat/group/create', [ChatController::class, 'createGroup'])
-            ->name('chat.group.create');
-// Leave Group
+        ->name('chat.group.create');
+    // Leave Group
     Route::post('/chat/{conversation}/leave', [ChatController::class, 'leaveGroup']);
 
     // Delete group 
@@ -54,10 +54,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Remove Member
     Route::post('/chat/{conversation}/remove-member', [ChatController::class, 'removeMember']);
-    });
 
-//Read chat
-Route::post('/conversations/{conversation}/read', [ChatController::class, 'markAsRead']);
+    //Read chat
+    Route::post('/conversations/{conversation}/read', [ChatController::class, 'markAsRead']);
+
+    //Delete Chat
+    Route::delete('/messages/{message}/delete',[ChatController::class, 'deleteForEveryone']);
+
+});
 
 
-require __DIR__.'/auth.php';
+
+require __DIR__ . '/auth.php';

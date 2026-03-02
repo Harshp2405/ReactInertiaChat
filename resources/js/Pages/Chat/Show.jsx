@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Download, PaperclipIcon } from 'lucide-react';
+import { Download, MessageSquareX, PaperclipIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 const Show = ({
@@ -13,8 +13,9 @@ const Show = ({
     setConversationList,
     setSelectedConversation,
     setMessages,
-    users,
+    // users,
     setShowAddModal,
+    onlineUsers,
 }) => {
     const [previewUrl, setPreviewUrl] = useState(null);
     const bottomRef = useRef(null);
@@ -161,6 +162,27 @@ const Show = ({
         }
     };
 
+    /* =====================================Status==================================== */
+    const otherUser = !selectedConversation?.is_group
+        ? selectedConversation?.users?.find((u) => u.id !== auth.user.id)
+        : null;
+
+    const isOnline = otherUser
+        ? onlineUsers.some((u) => u.id === otherUser.id)
+        : false;
+
+
+    /* ================================Delete Messsage============================ */
+    const deleteMessage = async (messageId) => {
+        await axios.delete(`/messages/${messageId}/delete`);
+
+        setMessages((prev) =>
+            prev.map((m) =>
+                m.id === messageId ? { ...m, is_deleted: true, body: null } : m,
+            ),
+        );
+    };
+
     return (
         <div className="flex flex-1 flex-col">
             {selectedConversation ? (
@@ -227,10 +249,24 @@ const Show = ({
                                 </div>
                             )}
                         </div>
+
+                        {!selectedConversation.is_group && (
+                            <p style={{ fontSize: 13, color: 'gray' }}>
+                                {isOnline ? (
+                                    <p style={{ fontSize: 15, color: 'green' }}>
+                                        Online
+                                    </p>
+                                ) : (
+                                    <p style={{ fontSize: 15, color: 'red' }}>
+                                        Offline
+                                    </p>
+                                )}
+                            </p>
+                        )}
                     </div>
 
                     {/* Messages */}
-                    
+
                     <div className="flex-1 space-y-2 overflow-y-auto bg-gray-50 p-4">
                         {messages.map((msg) => {
                             if (msg.type === 'system') {
@@ -317,7 +353,7 @@ const Show = ({
                                         )}
 
                                         {/* Time */}
-                                        <div className="mt-1 flex justify-around gap-3 align-bottom text-right text-[10px] opacity-70">
+                                        <div className="mt-1 flex justify-around gap-3 text-right align-bottom text-[10px] opacity-70">
                                             {/* Sender Name (only group & not mine) */}
                                             {selectedConversation.is_group &&
                                                 !isMine && (
@@ -331,11 +367,32 @@ const Show = ({
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                             })}
+                                            
                                             {isMine && (
                                                 <span className="ml-2 text-xs text-sky-50">
-                                                    {msg.read_at ? 'read' : 'unread'}
+                                                    {msg.is_deleted == false ? (msg.read_at
+                                                        ? 'read'
+                                                        : 'unread') :( " " )}
+                                                    {}
                                                 </span>
                                             )}
+                                            {/* Delete */}
+                                            <div>
+                                                {msg.sender_id ===
+                                                    auth.user.id &&
+                                                    !msg.is_deleted && (
+                                                        <button
+                                                            onClick={() => {
+                                                                deleteMessage(
+                                                                    msg.id,
+                                                                );
+                                                            }}
+                                                            className="ml-2 text-sm text-red-500"
+                                                        >
+                                                            <Trash2 className="h-5 w-5" />
+                                                        </button>
+                                                    )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
