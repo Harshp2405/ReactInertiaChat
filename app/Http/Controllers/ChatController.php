@@ -10,7 +10,10 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ChatController extends Controller
@@ -40,6 +43,16 @@ class ChatController extends Controller
                     'is_group' => $conversation->is_group,
                     'users' => $conversation->users,
                     'createdby'=>$conversation->created_by,
+
+
+                // 'userswithKey' => $conversation->users->map(function ($user) {
+                //     return [
+                //         'id' => $user->id,
+                //         'name' => $user->name,
+                //         'public_key' => $user->public_key,
+                //     ];
+                // }),
+
                     'last_message' => $conversation->lastMessage,
                     'unreadCount'=>$conversation->messages()->whereNull("read_at")->where("sender_id" , "!=" , auth()->id())
                     ->where("is_deleted" , "!=" , "1")
@@ -104,7 +117,10 @@ class ChatController extends Controller
 
         $message = $conversation->messages()->create([
             'sender_id' => $authId,
-            'body' => $request->body,
+            // 'body' => $request->body,
+            'body' => $request->body
+                ? Crypt::encryptString($request->body)
+                : null,
         ]);
 
 
@@ -394,27 +410,48 @@ class ChatController extends Controller
 
         return response()->json(['success' => true]);
     }
-
     public function deleteForEveryone(Message $message)
     {
         $authUser = auth()->user();
 
-        // Only sender can delete
         if ($message->sender_id !== $authUser->id) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        // Update message
-        $message->update([
-            'is_deleted' => true,
-            'deleted_at' => now(),
-            'body' => null
-        ]);
+        $messageId = $message->id;
+        $conversationId = $message->conversation_id;
 
-        broadcast(new MessageDeleted($message))->toOthers();
+        try {
 
-        return response()->json([
-            'message_id' => $message->id
-        ]);
+            // Delete attachments safely
+            $attachments = $message->attachments()->get();
+
+            foreach ($attachments as $attachment) {
+
+                if (!empty($attachment->file_path)) {
+
+                    if (Storage::disk('public')->exists($attachment->file_path)) {
+                        Storage::disk('public')->delete($attachment->file_path);
+                    }
+                }
+
+                $attachment->delete();
+            }
+
+            $message->delete();
+
+            broadcast(new MessageDeleted($messageId, $conversationId))->toOthers();
+
+            return response()->json([
+                'message_id' => $messageId
+            ]);
+        } catch (\Exception $e) {
+
+            Log::error($e);
+
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

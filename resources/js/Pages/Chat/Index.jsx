@@ -24,6 +24,7 @@ const Index = ({ auth, conversations, users }) => {
 
     const [onlineUsers, setOnlineUsers] = useState([]);
 
+
     const { data, setData } = useForm({
         body: '',
         file: [],
@@ -473,7 +474,7 @@ const Index = ({ auth, conversations, users }) => {
                                 </div>
                                 <div>
                                     {conversation.unreadCount > 0 && (
-                                        <span className="items-center justify-end rounded-full bg-green-600 px-2 py-1 text-xs font-bold leading-none text-white">
+                                        <span className="items-center justify-end rounded-full bg-red-600 px-2 py-1 text-xs font-bold leading-none text-white">
                                             {conversation.unreadCount}
                                         </span>
                                     )}

@@ -28,3 +28,7 @@ Broadcast::channel('online', function ($user) {
         'name' => $user->name,
     ];
 });
+
+Broadcast::channel('chat.{conversationId}', function ($user, $conversationId) {
+    return true;
+});

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Crypt;
 
 class Message extends Model
 {
@@ -16,7 +17,21 @@ class Message extends Model
         'is_deleted',
         'deleted_at',
     ];
-    
+
+
+    public function getBodyAttribute($value)
+    {
+        if (!$value) return null;
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (\Exception $e) {
+            return [
+                "error" => $e
+            ];
+        }
+    }
+
     protected $casts = [
         'read_at' => 'datetime',
     ];

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
@@ -43,6 +44,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/chat/group/create', [ChatController::class, 'createGroup'])
         ->name('chat.group.create');
+
+
     // Leave Group
     Route::post('/chat/{conversation}/leave', [ChatController::class, 'leaveGroup']);
 
@@ -59,8 +62,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/conversations/{conversation}/read', [ChatController::class, 'markAsRead']);
 
     //Delete Chat
-    Route::delete('/messages/{message}/delete',[ChatController::class, 'deleteForEveryone']);
+    Route::delete('/messages/{message}/delete', [ChatController::class, 'deleteForEveryone']);
 
+    // User Public Key
+    Route::post('/user/public-key', [ProfileController::class, 'storePublicKey'])
+        ->middleware('auth');
 });
 
 

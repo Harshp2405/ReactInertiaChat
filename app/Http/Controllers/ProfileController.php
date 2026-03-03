@@ -94,4 +94,17 @@ class ProfileController extends Controller
 
         return Redirect::to('/');
     }
+
+    // public function storePublicKey(Request $request)
+    // {
+    //     $request->validate([
+    //         'public_key' => 'required|string'
+    //     ]);
+
+    //     $user = auth()->user();
+    //     $user->public_key = $request->public_key;
+    //     $user->save();
+
+    //     return response()->json(['success' => true]);
+    // }
 }

@@ -15,20 +15,30 @@ class MessageDeleted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $message;
+    public $messageId;
+    public $conversationId;
 
-    public function __construct($message)
+    public function __construct($messageId, $conversationId)
     {
-        $this->message = $message;
+        $this->messageId = $messageId;
+        $this->conversationId = $conversationId;
     }
 
     public function broadcastOn()
     {
-        return new PrivateChannel('chat.' . $this->message->conversation_id);
+        return new PrivateChannel('chat.' . $this->conversationId);
     }
 
     public function broadcastAs()
     {
         return 'message.deleted';
     }
+
+    public function broadcastWith()
+    {
+        return [
+            'message_id' => $this->messageId,
+        ];
+    }
+    
 }
