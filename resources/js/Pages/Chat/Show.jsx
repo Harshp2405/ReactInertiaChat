@@ -184,12 +184,12 @@ const Show = ({
     };
 
     return (
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col bg-white dark:bg-gray-900">
             {selectedConversation ? (
                 <>
                     {/* Header */}
-                    <div className="border-b bg-gray-100 p-4">
-                        <div className="flex items-center justify-between border-b bg-gray-100 p-4">
+                    <div className="border-b bg-gray-100 p-4 dark:border-gray-700 dark:bg-gray-800">
+                        <div className="flex items-center justify-between border-b bg-gray-100 p-4 dark:border-gray-700 dark:bg-gray-800">
                             <div
                                 onClick={() =>
                                     selectedConversation.is_group
@@ -199,7 +199,7 @@ const Show = ({
                                 }
                                 className="cursor-pointer"
                             >
-                                <div className="font-semibold">
+                                <div className="font-semibold dark:text-white">
                                     {selectedConversation.name}
                                 </div>
 
@@ -218,7 +218,7 @@ const Show = ({
                                 )}
 
                                 {selectedConversation.is_group && (
-                                    <div className="text-xs text-gray-500">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
                                         {selectedConversation.users
                                             ?.map((u) => u.name)
                                             .join(', ')}
@@ -264,13 +264,13 @@ const Show = ({
 
                     {/* Messages */}
 
-                    <div className="flex-1 space-y-2 overflow-y-auto bg-gray-50 p-4">
+                    <div className="flex-1 space-y-2 overflow-y-auto bg-gray-50 p-4 dark:bg-gray-900">
                         {messages.map((msg) => {
                             if (msg.type === 'system') {
                                 return (
                                     <div
                                         key={msg.id}
-                                        className="my-2 text-center text-sm text-gray-500"
+                                        className="my-2 text-center text-sm text-gray-500 dark:text-gray-400"
                                     >
                                         {msg.body}
                                     </div>
@@ -290,7 +290,7 @@ const Show = ({
                                         className={`max-w-[75%] rounded-2xl px-3 py-2 shadow-sm ${
                                             isMine
                                                 ? 'rounded-br-md bg-blue-500 text-white'
-                                                : 'rounded-bl-md bg-gray-500 text-gray-200'
+                                                : 'rounded-bl-md bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                                         }`}
                                     >
                                         {/* Attachments */}
@@ -403,7 +403,7 @@ const Show = ({
                     {/* Input */}
                     <form
                         onSubmit={handleSubmit}
-                        className="flex gap-2 border-t p-4"
+                        className="flex gap-2 border-t p-4 dark:border-gray-700 dark:bg-gray-800"
                     >
                         {previewUrl && (
                             <div className="relative w-32">
@@ -433,7 +433,7 @@ const Show = ({
 
                         <label
                             htmlFor="fileInput"
-                            className="cursor-pointer rounded-lg bg-gray-200 px-3 py-2"
+                            className="cursor-pointer rounded-lg bg-gray-200 px-3 py-2 dark:bg-gray-700 dark:text-white"
                         >
                             <PaperclipIcon className="h-5 w-5 text-center" />
                         </label>
@@ -448,7 +448,7 @@ const Show = ({
                                 })
                             }
                             placeholder="Type a message..."
-                            className="flex-1 rounded-lg border px-4 py-2"
+                            className="flex-1 rounded-lg border px-4 py-2 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                         />
 
                         <button
@@ -460,7 +460,7 @@ const Show = ({
                     </form>
                 </>
             ) : (
-                <div className="flex flex-1 items-center justify-center text-gray-400">
+                <div className="flex flex-1 items-center justify-center text-gray-400 dark:text-gray-500">
                     Select a conversation to start chatting
                 </div>
             )}
@@ -468,7 +468,7 @@ const Show = ({
             {/* Group Info Modal */}
             {showGroupInfo && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="w-full rounded-lg bg-white p-6 md:w-1/2">
+                    <div className="w-full rounded-lg bg-white p-6 dark:bg-gray-800 dark:text-white md:w-1/2">
                         <h2 className="mb-4 text-xl font-bold">
                             {selectedConversation.name} - Group Info
                         </h2>
@@ -489,7 +489,7 @@ const Show = ({
                                 {selectedConversation.users?.map((user) => (
                                     <div
                                         key={user.id}
-                                        className="flex items-center justify-between rounded border px-3 py-2"
+                                        className="flex items-center justify-between rounded border px-3 py-2 dark:border-gray-600"
                                     >
                                         <span>
                                             {user.name}

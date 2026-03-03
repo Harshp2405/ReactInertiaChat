@@ -358,7 +358,7 @@ const Index = ({ auth, conversations, users }) => {
         <AuthenticatedLayout>
             {/* Create Group */}
 
-            <div className="flex justify-between border-b bg-white p-3">
+            <div className="flex justify-between border-b bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
                 <div>
                     {auth.user.profile_image !== null ? (
                         <img
@@ -376,15 +376,15 @@ const Index = ({ auth, conversations, users }) => {
                 </div>
                 <button
                     onClick={() => setShowGroupModal(true)}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                 >
                     + Create Group
                 </button>
             </div>
 
-            <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg bg-white shadow">
-                <div className="border-b p-4">
-                    <div className="mb-2 font-semibold">Start New Chat</div>
+            <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900">
+                <div className="border-b p-4 dark:border-gray-700 dark:bg-gray-900">
+                    <div className="mb-2 font-semibold dark:text-white">Start New Chat</div>
 
                     {users
                         .filter((user) => !existingUserIds.includes(user.id))
@@ -392,15 +392,15 @@ const Index = ({ auth, conversations, users }) => {
                             <div
                                 key={user.id}
                                 onClick={() => startChat(user.id)}
-                                className="cursor-pointer rounded p-2 hover:bg-gray-200"
+                                className="cursor-pointer rounded p-2 hover:bg-gray-200 dark:hover:bg-gray-700"
                             >
                                 {user.name}
                             </div>
                         ))}
                 </div>
                 {/* ================= CONVERSATION LIST ================= */}
-                <div className="w-1/5 overflow-auto border-r bg-gray-50">
-                    <div className="border-b p-4 font-semibold">
+                <div className="w-1/5 overflow-auto border-r bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+                    <div className="border-b p-4 font-semibold dark:text-gray-200">
                         Conversations
                     </div>
                     {conversationList
@@ -419,12 +419,11 @@ const Index = ({ auth, conversations, users }) => {
                                     )
                                 )}
                                 key={conversation.conversation_id}
-                                className={`flex flex-row justify-start gap-5 border-b p-2 ${
-                                    // className={`grid grid-cols-12 gap-2 justify-between border-b p-4 ${
+                                className={`flex flex-row justify-start gap-5 border-b p-2 dark:border-gray-700 ${
                                     selectedConversation?.conversation_id ===
                                     conversation.conversation_id
-                                        ? 'bg-gray-300'
-                                        : ''
+                                        ? 'bg-gray-300 dark:bg-gray-700'
+                                        : 'hover:bg-gray-200 dark:hover:bg-gray-700'
                                 }`}
                             >
                                 <img
@@ -434,7 +433,7 @@ const Index = ({ auth, conversations, users }) => {
                                 />
                                 <div className="">
                                     <div className="cursor-auto">
-                                        <div className="font-medium">
+                                        <div className="font-medium text-gray-900 dark:text-gray-100">
                                             {conversation.is_group
                                                 ? conversation.name
                                                 : conversation.users?.find(
@@ -442,8 +441,8 @@ const Index = ({ auth, conversations, users }) => {
                                                           u.id !== auth.user.id,
                                                   )?.name}
                                         </div>
-                                        
-                                        <div className="truncate text-sm text-gray-500">
+
+                                        <div className="truncate text-sm text-gray-500 dark:text-gray-400">
                                             {conversation.last_message ? (
                                                 conversation.is_group ? (
                                                     <>
@@ -492,7 +491,7 @@ const Index = ({ auth, conversations, users }) => {
                                                 );
                                             }}
                                         >
-                                            <Trash className="h-5 w-5 text-red-500" />
+                                            <Trash className="h-5 w-5 text-red-500 dark:text-red-400" />
                                         </button>
                                     ) : (
                                         ''

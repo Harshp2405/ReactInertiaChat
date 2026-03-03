@@ -3,19 +3,59 @@ import Dropdown from '@/Components/Dropdown';
 import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState , useEffect } from 'react';
 
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;
 
+    const [theme, setTheme] = useState(
+        localStorage.getItem('theme') || 'light',
+    );
+
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
+
+        useEffect(() => {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            }
+        }, [theme]);
+
+        const toggleTheme = () => {
+            setTheme(theme === 'dark' ? 'light' : 'dark');
+        };
+
+        useEffect(() => {
+            const interval = setInterval(() => {
+                const change = confirm(
+                    'Do you want to switch theme?\nOK = Dark Mode\nCancel = Light Mode',
+                );
+
+                if (change) {
+                    setTheme('dark');
+                } else {
+                    setTheme('light');
+                }
+            }, 600000); 
+
+            return () => clearInterval(interval);
+        }, []);
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
             <nav className="border-b border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                     <div className="flex h-16 justify-between">
+                        <button
+                            onClick={toggleTheme}
+                            className="mr-4 rounded-md bg-gray-200 px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+                        >
+                            {theme === 'dark' ? ' Light' : 'Dark'}
+                        </button>
                         <div className="flex">
                             <div className="flex shrink-0 items-center">
                                 <Link href="/">
@@ -31,10 +71,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                     Dashboard
                                 </NavLink>
 
-                                <NavLink
-                                    href="/chats"
-                                    active="/chats"
-                                >
+                                <NavLink href="/chats" active="/chats">
                                     Chats
                                 </NavLink>
                             </div>
