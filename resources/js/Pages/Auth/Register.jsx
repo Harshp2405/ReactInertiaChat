@@ -4,6 +4,8 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
+import * as yup from 'yup'
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -12,13 +14,46 @@ export default function Register() {
         password: '',
         password_confirmation: '',
     });
+    const [yupErrors, setYupErrors] = useState({});
+    const validation = new yup.ObjectSchema({
+        name: yup.string(),
+        email: yup.string().email('Valid Email').required('Email is required'),
+        password: yup
+            .string()
+            .required('Password is required')
+            .notOneOf(
+                [yup.ref('email')],
+                'Password cannot be the same as email',
+            )
+            .matches(/^(?=.*[a-z])(?=.*[A-Z])/, 'Required lower and Upper case latter')
+            .matches(/^(?=.*\d)(?=.*[@$!%*?&])/,'Required number and Special character'),
+    });
 
-    const submit = (e) => {
+    const submit = async (e) => {
         e.preventDefault();
 
-        post(route('register'), {
-            onFinish: () => reset('password', 'password_confirmation'),
-        });
+        try {
+            const valid = await validation.validate(data, {
+                abortEarly: false,
+            });
+
+            post(route('register'), {
+                onFinish: () => reset('password', 'password_confirmation'),
+            });
+        } catch (err) {
+            // console.log(err)
+            const formattedErrors = {};
+
+            if (err.inner && err.inner.length > 0) {
+                err.inner.forEach((error) => {
+                    if (error.path) formattedErrors[error.path] = error.message;
+                });
+            } else if (err.path) {
+                formattedErrors[err.path] = err.message;
+            }
+            console.log(formattedErrors);
+            setYupErrors(formattedErrors);
+        }
     };
 
     return (
@@ -40,7 +75,10 @@ export default function Register() {
                         required
                     />
 
-                    <InputError message={errors.name} className="mt-2" />
+                    <InputError
+                        message={yupErrors.name || errors.name}
+                        className="mt-2"
+                    />
                 </div>
 
                 <div className="mt-4">
@@ -57,7 +95,10 @@ export default function Register() {
                         required
                     />
 
-                    <InputError message={errors.email} className="mt-2" />
+                    <InputError
+                        message={yupErrors.email || errors.email}
+                        className="mt-2"
+                    />
                 </div>
 
                 <div className="mt-4">
@@ -74,7 +115,10 @@ export default function Register() {
                         required
                     />
 
-                    <InputError message={errors.password} className="mt-2" />
+                    <InputError
+                        message={yupErrors.password || errors.password}
+                        className="mt-2"
+                    />
                 </div>
 
                 <div className="mt-4">
@@ -97,7 +141,10 @@ export default function Register() {
                     />
 
                     <InputError
-                        message={errors.password_confirmation}
+                        message={
+                            yupErrors.password_confirmation ||
+                            errors.password_confirmation
+                        }
                         className="mt-2"
                     />
                 </div>
@@ -118,11 +165,12 @@ export default function Register() {
                                 profile_image: e.target.files[0],
                             })
                         }
-                        
                     />
 
                     <InputError
-                        message={errors.profile_image}
+                        message={
+                            yupErrors.profile_image || errors.profile_image
+                        }
                         className="mt-2"
                     />
                 </div>

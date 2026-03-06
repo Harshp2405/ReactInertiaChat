@@ -383,8 +383,10 @@ const Index = ({ auth, conversations, users }) => {
             </div>
 
             <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg bg-white shadow dark:bg-gray-900">
-                <div className="border-b p-4 dark:border-gray-700 dark:bg-gray-900">
-                    <div className="mb-2 font-semibold dark:text-white">Start New Chat</div>
+                <div className="border-b p-4 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                    <div className="mb-2 font-semibold dark:text-white">
+                        Start New Chat
+                    </div>
 
                     {users
                         .filter((user) => !existingUserIds.includes(user.id))
@@ -399,7 +401,7 @@ const Index = ({ auth, conversations, users }) => {
                         ))}
                 </div>
                 {/* ================= CONVERSATION LIST ================= */}
-                <div className="w-1/5 overflow-auto border-r bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+                <div className="w-1/5 overflow-auto border-r bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                     <div className="border-b p-4 font-semibold dark:text-gray-200">
                         Conversations
                     </div>
@@ -419,7 +421,7 @@ const Index = ({ auth, conversations, users }) => {
                                     )
                                 )}
                                 key={conversation.conversation_id}
-                                className={`flex flex-row justify-start gap-5 border-b p-2 dark:border-gray-700 ${
+                                className={`flex flex-row justify-start gap-5 border-b p-2 dark:border-gray-700 dark:text-white ${
                                     selectedConversation?.conversation_id ===
                                     conversation.conversation_id
                                         ? 'bg-gray-300 dark:bg-gray-700'

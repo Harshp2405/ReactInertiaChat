@@ -39,6 +39,7 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
-        "lucide-react": "^0.575.0"
+        "lucide-react": "^0.575.0",
+        "yup": "^1.7.1"
     }
 }
